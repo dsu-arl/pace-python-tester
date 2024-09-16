@@ -27,7 +27,7 @@ def run(script_path, input=""):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            preexec_fn=self.demote_user(user_uid, user_gid),
+            preexec_fn=demote_user(user_uid, user_gid),
             text=True
         )
 
