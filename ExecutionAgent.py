@@ -1,6 +1,7 @@
 #!/opt/pwn.college/python
 
 import subprocess
+import importlib
 import traceback
 import pwd
 import sys
@@ -15,10 +16,22 @@ def demote_user(user_uid, user_gid):
 
 def get_variables(script_path):
     """ Get a dict of defined variables and their types from the students script """
-    import importlib
 
-    module_name = script_path.replace('.py','')
-    module = importlib.import_module(module_name)
+    if not script_path.endswith('.py'):
+        raise ValueError("Your script must end with '.py'")
+
+    module_name = os.path.splitext(os.path.basename(script_path))[0]
+
+    spec = importlib.util.spec_from_file_location(module_name, script_path)
+    if spec is None:
+        raise ImportError(f"Cannot load module from {script_path}")
+
+    module = importlib.util.module_from_spec(spec)
+
+    try:
+        spec.loader.exec_module(module)
+    except Exception as e:
+        raise ImportError(f"Failed to load module from {script_path}: {e}")
 
     vars = {}
     module_dict = module.__dict__
