@@ -7,11 +7,30 @@ import sys
 import os
 
 def demote_user(user_uid, user_gid):
-    """ private method to demote the user env to the 'hacker' user to avoid /flag read attempts """
+    """ method to demote the user env to the 'hacker' user to avoid /flag read attempts """
     def result():
         os.setgid(user_gid)
         os.setuid(user_uid)
     return result
+
+def get_variables(script_path):
+    """ Get a dict of defined variables and their types from the students script """
+    import importlib
+
+    module_name = script_path.replace('.py','')
+    module = importlib.import_module(module_name)
+
+    vars = {}
+    module_dict = module.__dict__
+    for name, value in module_dict.items():
+        # Skip built-in attributes
+        if name.startswith('__'):
+            continue
+
+        value_type = type(value).__name__
+        vars[name] = {value_type: value}
+
+    return vars
 
 def run(script_path, input=""):
     try:
