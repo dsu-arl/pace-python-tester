@@ -48,6 +48,21 @@ def get_variables(script_path):
 
     return vars
 
+def parse_script(script_path, regex):
+    """ Checks a users script for specified regex match """
+
+    if not script_path.endswith('.py'):
+        raise ValueError("Your script must end with '.py'")
+
+    regex = re.compile(regex)
+    with open(script_path, 'r') as script:
+        content = script.read()
+
+        if not regex.search(content):
+            return False
+
+        return True
+
 def run(script_path, input=""):
     try:
         # Get user info to demote and avoid /flag read attempts
