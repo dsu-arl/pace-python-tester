@@ -6,6 +6,7 @@ import traceback
 import pwd
 import sys
 import os
+import re
 
 def demote_user(user_uid, user_gid):
     """ method to demote the user env to the 'hacker' user to avoid /flag read attempts """
