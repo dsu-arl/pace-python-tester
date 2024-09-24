@@ -15,7 +15,10 @@ def demote_user(user_uid, user_gid):
     return result
 
 def get_variables(script_path):
-    """ Get a dict of defined variables and their types from the students script """
+    """
+        UNSAFE: Runs code with SUID,
+        Get a dict of defined variables and their types from the students script
+    """
 
     if not script_path.endswith('.py'):
         raise ValueError("Your script must end with '.py'")
