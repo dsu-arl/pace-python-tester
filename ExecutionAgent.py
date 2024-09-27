@@ -3,6 +3,7 @@
 import subprocess
 import importlib
 import traceback
+import ast
 import pwd
 import sys
 import os
@@ -15,39 +16,80 @@ def demote_user(user_uid, user_gid):
         os.setuid(user_uid)
     return result
 
-def get_variables(script_path):
+def get_defined_variables(script_path):
     """
-        UNSAFE: Runs code with SUID,
-        Get a dict of defined variables and their types from the students script
+    Parses the user's Python script and returns a dictionary of defined variables
+    and functions, along with their inferred types and initial values.
+    This method does not execute the code, making it safer.
+
+    EXAMPLE
+    {'variables': {'a': {'type': 'Str', 'initial_value': 'hello'}, 'b': {'type': 'Int', 'initial_value': 1}}, 'functions': {'hello'}}
     """
 
     if not script_path.endswith('.py'):
         raise ValueError("Your script must end with '.py'")
 
-    module_name = os.path.splitext(os.path.basename(script_path))[0]
+    # Read the script file
+    with open(script_path, 'r') as file:
+        code = file.read()
 
-    spec = importlib.util.spec_from_file_location(module_name, script_path)
-    if spec is None:
-        raise ImportError(f"Cannot load module from {script_path}")
+    # Parse the code into an Abstract Syntax Tree (AST)
+    tree = ast.parse(code)
 
-    module = importlib.util.module_from_spec(spec)
+    defined_names = {
+        'variables': {},
+        'functions': set(),
+    }
 
-    try:
-        spec.loader.exec_module(module)
-    except Exception as e:
-        raise ImportError(f"Failed to load module from {script_path}: {e}")
+    class NameCollector(ast.NodeVisitor):
+        def visit_Assign(self, node):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    # Get the value being assigned
+                    value = node.value
+                    inferred_type = type(value)
+                    # Attempt to extract a representative value if possible
+                    initial_value = self.get_initial_value(value)
+                    defined_names['variables'][target.id] = {
+                        'type': self.get_type_name(inferred_type, initial_value),
+                        'initial_value': initial_value
+                    }
+            self.generic_visit(node)
 
-    vars = {}
-    module_dict = module.__dict__
-    for name, value in module_dict.items():
-        # Skip built-in attributes
-        if name.startswith('__'):
-            continue
+        def visit_FunctionDef(self, node):
+            defined_names['functions'].add(node.name)
+            self.generic_visit(node)
 
-        value_type = type(value).__name__
-        vars[name] = {value_type: value}
+        def get_initial_value(self, value):
+            # Check for different types using ast.Constant
+            if isinstance(value, ast.Constant):
+                return value.value  # Directly return the constant value
+            elif isinstance(value, ast.List):
+                return [self.get_initial_value(el) for el in value.elts]
+            elif isinstance(value, ast.Dict):
+                return {self.get_initial_value(k): self.get_initial_value(v) for k, v in zip(value.keys, value.values())}
+            elif isinstance(value, ast.Name):
+                return value.id  # Returning the name itself
+            return None  # For unsupported types
 
-    return vars
+        def get_type_name(self, inferred_type, initial_value):
+            # Map inferred types to desired output type names
+            if isinstance(initial_value, str):
+                return 'Str'
+            elif isinstance(initial_value, int):
+                return 'Int'
+            elif isinstance(initial_value, float):
+                return 'Float'
+            elif isinstance(initial_value, list):
+                return 'List'
+            elif isinstance(initial_value, dict):
+                return 'Dict'
+            return 'Unknown'  # For unsupported types
+
+    # Collect variable and function names
+    NameCollector().visit(tree)
+
+    return defined_names
 
 def parse_script(script_path, regex):
     """ Checks a users script for specified regex match """
